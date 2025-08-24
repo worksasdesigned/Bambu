@@ -91,6 +91,7 @@ function header() {
 			h('button', { class: 'button', onclick: () => showCaptureForm() }, 'Gutschein erfassen'),
 			h('button', { class: 'button alt', onclick: () => showAssignList() }, 'Gutscheine verwenden'),
 			h('button', { class: 'button warn', onclick: () => showPlanManager() }, 'Gutscheine Planen'),
+			h('button', { class: 'button', style:'margin-left:8px', onclick: () => showImportModal() }, 'Import Data'),
 			h('button', { class: 'button', style:'margin-left:8px', onclick: async () => { await api('/api/logout', { method: 'POST' }); location.reload(); } }, 'Logout')
 		) : ''
 	);
@@ -121,7 +122,7 @@ function changePasswordCard() {
 			h('div', {}, h('label', {}, 'Altes Passwort'), h('input', { type:'password', oninput: e => oldP = e.target.value })),
 			h('div', {}, h('label', {}, 'Neues Passwort'), h('input', { type:'password', oninput: e => newP = e.target.value }))
 		),
-		h('div', { style:'margin-top:10px' }, h('button', { class:'button', onclick: async () => {
+		h('div', { style:'margin-top:10px' }, h('button', { class:'button primary', onclick: async () => {
 			try {
 				await api('/api/change-password', { method:'POST', body: JSON.stringify({ oldPassword: oldP, newPassword: newP }) });
 				state.session.mustChange = false;
@@ -208,13 +209,13 @@ function showCaptureForm() {
 	let date=today(), code='', value=40, remaining=40, shop='EU', in_review=false;
 	wrap.body.append(
 		formRow('Datum', h('input', { type:'date', value:date, oninput:e=>date=e.target.value })),
-		formRow('Gutscheincode (20)', h('input', { maxlength:20, placeholder:'20 Stellen', oninput:e=>code=e.target.value })),
+		formRow('Gutscheincode', h('input', { oninput:e=>code=e.target.value })),
 		formRow('Wert', h('input', { type:'number', value:40, oninput:e=>value=Number(e.target.value) })),
 		formRow('Restwert', h('input', { type:'number', value:40, oninput:e=>remaining=Number(e.target.value) })),
 		formRow('Shop', selectShop(shop, v=>shop=v)),
 		formRow('In Prüfung', h('input', { type:'checkbox', checked:false, oninput:e=>in_review = e.target.checked }))
 	);
-	wrap.footer.append(h('button', { class:'button', onclick: async () => {
+	wrap.footer.append(h('button', { class:'button primary', onclick: async () => {
 		try {
 			await api('/api/vouchers', { method:'POST', body: JSON.stringify({ date, code, value, remaining, shop, in_review }) });
 			wrap.close();
@@ -251,7 +252,7 @@ function assignSelected(wrap) {
 		formRow('Datum', h('input', { type:'date', value:date, oninput:e=>date=e.target.value }))
 	);
 	wrap.footer.innerHTML='';
-	wrap.footer.append(h('button', { class:'button', onclick: async () => {
+	wrap.footer.append(h('button', { class:'button primary', onclick: async () => {
 		if (!name) { alert('Name ist Pflicht'); return; }
 		try {
 			await api('/api/vouchers/assign', { method:'POST', body: JSON.stringify({ ids: Array.from(state.selection), name, object, date }) });
@@ -269,7 +270,7 @@ function showPlanManager() {
 		formRow('Wert', h('input', { type:'number', value:40, oninput:e=>value=Number(e.target.value) })),
 		formRow('Datum', h('input', { type:'date', value:date, oninput:e=>date=e.target.value }))
 	);
-	wrap.footer.append(h('button', { class:'button', onclick: async () => {
+	wrap.footer.append(h('button', { class:'button primary', onclick: async () => {
 		if (!name || !value || !date) { alert('Bitte alle Pflichtfelder ausfüllen'); return; }
 		await api('/api/plans', { method:'POST', body: JSON.stringify({ name, value, date }) });
 		await refreshPlansTable();
@@ -308,7 +309,7 @@ function editVoucher(v) {
 		formRow('Name', h('input', { value:assigned_to, oninput:e=>assigned_to=e.target.value })),
 		formRow('Objekt', h('input', { value:object, oninput:e=>object=e.target.value }))
 	);
-	wrap.footer.append(h('button', { class:'button', onclick: async () => {
+	wrap.footer.append(h('button', { class:'button primary', onclick: async () => {
 		try {
 			await api(`/api/vouchers/${v.id}`, { method:'PUT', body: JSON.stringify({ date, code, value, remaining, shop, in_review, assigned_to, object }) });
 			wrap.close();
@@ -335,6 +336,27 @@ function modal(titleText) {
 	overlay.appendChild(box);
 	function close(){ overlay.remove(); }
 	return { body, footer, close, title };
+}
+
+function showImportModal() {
+	const wrap = modal('Import Data');
+	let text='';
+	const textarea = h('textarea', { style:'width:100%;min-height:280px', placeholder:'Datum;Gutschein;Name;Objekt', oninput:e=>text=e.target.value });
+	wrap.body.append(
+		h('div', { class:'label' }, 'CSV einfügen (Semikolon-getrennt): Datum; Gutschein; Name; Objekt'),
+		textarea
+	);
+	wrap.footer.append(h('button', { class:'button primary', onclick: async () => {
+		if (!text.trim()) { alert('Bitte CSV einfügen'); return; }
+		try {
+			const res = await api('/api/vouchers/import', { method:'POST', body: JSON.stringify({ csv: text }) });
+			alert(`Import fertig: ${res.created} erstellt, ${res.skipped} übersprungen, ${res.used_marked} verwendet markiert`);
+			wrap.close();
+			await refreshData();
+		} catch (e) {
+			alert(e.message);
+		}
+	} }, 'Speichern'));
 }
 
 bootstrap().catch(err => { console.error(err); });
