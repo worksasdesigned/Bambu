@@ -1,0 +1,19 @@
+version: '3.8'
+services:
+  web:
+    build: .
+    container_name: bambu-gutschein-web
+    ports:
+      - "8080:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - DEFAULT_PASSWORD=bambu
+      - APP_SECRET=please-change-me
+      - DATA_DIR=/app/data
+    volumes:
+      - data:/app/data
+      - ./public/background.png:/app/public/background.png:ro
+    restart: unless-stopped
+volumes:
+  data:
