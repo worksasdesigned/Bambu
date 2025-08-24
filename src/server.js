@@ -13,7 +13,14 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(helmet());
+app.use(helmet({
+	contentSecurityPolicy: {
+		useDefaults: true,
+		directives: {
+			"script-src": ["'self'", "'unsafe-inline'"],
+		}
+	}
+}));
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
