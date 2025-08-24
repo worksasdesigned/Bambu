@@ -19,7 +19,7 @@ Eine kleine, per Docker Compose (Portainer) deploybare Web-App zur Verwaltung vo
 version: '3.8'
 services:
   web:
-    image: ghcr.io/your-org/bambu-gutschein:latest # ODER build aus Repository; hier beim lokalen Deploy build: .
+    image: ghcr.io/worksasdesigned/bambu:latest # ODER build aus Repository; hier beim lokalen Deploy build: .
     build: .
     container_name: bambu-gutschein-web
     ports:
