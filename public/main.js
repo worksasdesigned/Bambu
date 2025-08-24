@@ -25,14 +25,15 @@ function h(tag, attrs={}, ...children) {
 		if (k === 'class') el.className = v;
 		else if (k === 'onclick') el.addEventListener('click', v);
 		else if (k === 'oninput') el.addEventListener('input', v);
+		else if (k === 'onchange') el.addEventListener('change', v);
 		else if (k === 'value') el.value = v;
 		else if (k === 'checked') el.checked = !!v;
 		else el.setAttribute(k, v);
 	}
 	for (const c of children.flat()) {
 		if (c == null) continue;
-		if (typeof c === 'string') el.appendChild(document.createTextNode(c));
-		else el.appendChild(c);
+		if (typeof c === 'string' || typeof c === 'number' || typeof c === 'boolean') el.appendChild(document.createTextNode(String(c)));
+		else if (c instanceof Node) el.appendChild(c);
 	}
 	return el;
 }
@@ -42,8 +43,16 @@ async function api(path, opts={}) {
 	const base = (p === '/') ? '' : (p.endsWith('/') ? p.slice(0, -1) : p);
 	const url = path.startsWith('/') ? `${base}${path}` : path;
 	const res = await fetch(url, { credentials: 'include', headers: { 'Content-Type': 'application/json' }, ...opts });
-	if (!res.ok) throw new Error((await res.json()).error || 'Fehler');
-	return res.json();
+	const readAsJsonSafe = async () => {
+		const text = await res.text();
+		try { return JSON.parse(text); } catch { return { error: text || 'Fehler' }; }
+	};
+	if (!res.ok) {
+		const data = await readAsJsonSafe();
+		throw new Error(data.error || 'Fehler');
+	}
+	const okText = await res.text();
+	try { return JSON.parse(okText); } catch { return okText; }
 }
 
 function money(v) { return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(Number(v||0)); }

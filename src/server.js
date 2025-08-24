@@ -23,6 +23,7 @@ app.use(helmet({
 		useDefaults: true,
 		directives: {
 			"script-src": ["'self'", "'unsafe-inline'"],
+			"script-src-attr": ["'unsafe-inline'"],
 			// Do not auto-upgrade http -> https for subresources
 			"upgrade-insecure-requests": null
 		}
@@ -134,9 +135,26 @@ app.post('/api/vouchers/import', (req, res) => {
 });
 
 app.put('/api/vouchers/:id', (req, res) => {
-	const id = Number(req.params.id);
-	const result = updateVoucher(id, req.body || {});
-	res.json({ ok: true, changes: result.changes });
+	try {
+		const id = Number(req.params.id);
+		if (!Number.isFinite(id)) return res.status(400).json({ error: 'invalid id' });
+		const input = req.body || {};
+		const fields = {};
+		if ('date' in input) fields.date = String(input.date);
+		if ('code' in input) fields.code = String(input.code);
+		if ('value' in input) fields.value = Number(input.value);
+		if ('remaining' in input) fields.remaining = Number(input.remaining);
+		if ('shop' in input) fields.shop = String(input.shop);
+		if ('in_review' in input) fields.in_review = input.in_review ? 1 : 0;
+		if ('assigned_to' in input) fields.assigned_to = input.assigned_to === '' ? null : String(input.assigned_to);
+		if ('object' in input) fields.object = input.object === '' ? null : String(input.object);
+		if ('used' in input) fields.used = input.used ? 1 : 0;
+		if ('used_date' in input) fields.used_date = input.used_date == null || input.used_date === '' ? null : String(input.used_date);
+		const result = updateVoucher(id, fields);
+		return res.json({ ok: true, changes: result.changes });
+	} catch (e) {
+		return res.status(400).json({ error: e.message || 'update failed' });
+	}
 });
 
 app.post('/api/vouchers/assign', (req, res) => {
