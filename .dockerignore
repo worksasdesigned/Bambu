@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log*
+yarn-error.log*
+.git
+.gitignore
+Dockerfile
+docker-compose.yml
+README.md
+data
+*.sqlite
+*.db
+public/background.png
