@@ -14,7 +14,7 @@ Eine kleine, per Docker deploybare Web-App zur Verwaltung von Bambu-Gutscheinen.
 
 ## docker Befehle
 `
-ker pull ghcr.io/worksasdesigned/bambu:latest
+doker pull ghcr.io/worksasdesigned/bambu:latest
 docker run -d --name bambu-gutschein-web -p 8080:3000 -e PORT=3000 -e NODE_ENV=production ghcr.io/worksasdesigned/bambu:latest
 docker logs -f bambu-gutschein-web
 `
