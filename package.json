@@ -1,0 +1,21 @@
+{
+  "name": "bambu-gutschein",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "9.6.0",
+    "cookie-parser": "1.4.6",
+    "cors": "2.8.5",
+    "express": "4.19.2",
+    "helmet": "7.1.0",
+    "multer": "1.4.5-lts.1",
+    "nanoid": "5.0.7",
+    "zod": "3.23.8",
+    "argon2": "0.41.1"
+  }
+}
