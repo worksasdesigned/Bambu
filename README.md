@@ -36,6 +36,8 @@ volumes:
 ```
 
 4. Nach dem Deploy ist die App unter `http://<host>:8080` erreichbar
+5. Testseite aufrufen: `http://<host>:8080/test.html`
+   - Zeigt, ob `styles.css` und der Healthcheck `/health` erreichbar sind
 5. Beim ersten Aufruf mit Passwort `bambu` anmelden und ein neues Passwort setzen
 
 ## Lokaler Build ohne Portainer
@@ -44,6 +46,7 @@ volumes:
 npm install
 npm run start
 # App unter http://localhost:3000
+# Testseite: http://localhost:3000/test.html
 ```
 
 ## Hinweise
