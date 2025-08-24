@@ -37,8 +37,16 @@ function h(tag, attrs={}, ...children) {
 	return el;
 }
 
+// Resolve API path relative to current location to support reverse proxies/subpaths
+const BASE_PATH = (() => {
+	const pathname = window.location.pathname;
+	return pathname.endsWith('/') ? pathname : pathname.replace(/[^/]+$/, '');
+})();
+
 async function api(path, opts={}) {
-	const res = await fetch(path, { credentials: 'include', headers: { 'Content-Type': 'application/json' }, ...opts });
+	const normalized = String(path || '').replace(/^\//, '');
+	const url = `${BASE_PATH}${normalized}`;
+	const res = await fetch(url, { credentials: 'include', headers: { 'Content-Type': 'application/json' }, ...opts });
 	if (!res.ok) throw new Error((await res.json()).error || 'Fehler');
 	return res.json();
 }
@@ -48,7 +56,7 @@ function fmtDate(s) { return s ? s.split('T')[0] : ''; }
 function today() { return new Date().toISOString().split('T')[0]; }
 
 async function bootstrap() {
-	const sess = await api('/api/session');
+	const sess = await api('api/session');
 	state.session = sess;
 	render();
 	if (sess.authed && !sess.mustChange) {
@@ -58,10 +66,10 @@ async function bootstrap() {
 
 async function refreshData() {
 	[state.kpis, state.vouchers, state.available, state.plans] = await Promise.all([
-		api('/api/kpis'),
-		api('/api/vouchers'),
-		api('/api/vouchers?available=true'),
-		api('/api/plans')
+		api('api/kpis'),
+		api('api/vouchers'),
+		api('api/vouchers?available=true'),
+		api('api/plans')
 	]);
 	render();
 }
@@ -88,7 +96,7 @@ function header() {
 			h('button', { class: 'button', onclick: () => showCaptureForm() }, 'Gutschein erfassen'),
 			h('button', { class: 'button alt', onclick: () => showAssignList() }, 'Gutscheine verwenden'),
 			h('button', { class: 'button warn', onclick: () => showPlanManager() }, 'Gutscheine Planen'),
-			h('button', { class: 'button', style:'margin-left:8px', onclick: async () => { await api('/api/logout', { method: 'POST' }); location.reload(); } }, 'Logout')
+			h('button', { class: 'button', style:'margin-left:8px', onclick: async () => { await api('api/logout', { method: 'POST' }); location.reload(); } }, 'Logout')
 		) : ''
 	);
 }
@@ -100,7 +108,7 @@ function loginCard() {
 		h('div', {}, h('input', { type:'password', placeholder:'Passwort', oninput: e => pwd = e.target.value })),
 		h('div', { style:'margin-top:10px' }, h('button', { class:'button', onclick: async () => {
 			try {
-				const r = await api('/api/login', { method:'POST', body: JSON.stringify({ password: pwd }) });
+				const r = await api('api/login', { method:'POST', body: JSON.stringify({ password: pwd }) });
 				state.session = { authed: true, mustChange: r.mustChange };
 				render();
 				if (!r.mustChange) await refreshData();
@@ -120,7 +128,7 @@ function changePasswordCard() {
 		),
 		h('div', { style:'margin-top:10px' }, h('button', { class:'button', onclick: async () => {
 			try {
-				await api('/api/change-password', { method:'POST', body: JSON.stringify({ oldPassword: oldP, newPassword: newP }) });
+				await api('api/change-password', { method:'POST', body: JSON.stringify({ oldPassword: oldP, newPassword: newP }) });
 				state.session.mustChange = false;
 				await refreshData();
 			} catch (e) { alert(e.message); }
@@ -213,7 +221,7 @@ function showCaptureForm() {
 	);
 	wrap.footer.append(h('button', { class:'button', onclick: async () => {
 		try {
-			await api('/api/vouchers', { method:'POST', body: JSON.stringify({ date, code, value, remaining, shop, in_review }) });
+			await api('api/vouchers', { method:'POST', body: JSON.stringify({ date, code, value, remaining, shop, in_review }) });
 			wrap.close();
 			await refreshData();
 		} catch (e) { alert(e.message); }
@@ -251,7 +259,7 @@ function assignSelected(wrap) {
 	wrap.footer.append(h('button', { class:'button', onclick: async () => {
 		if (!name) { alert('Name ist Pflicht'); return; }
 		try {
-			await api('/api/vouchers/assign', { method:'POST', body: JSON.stringify({ ids: Array.from(state.selection), name, object, date }) });
+			await api('api/vouchers/assign', { method:'POST', body: JSON.stringify({ ids: Array.from(state.selection), name, object, date }) });
 			wrap.close();
 			await refreshData();
 		} catch (e) { alert(e.message); }
@@ -268,23 +276,23 @@ function showPlanManager() {
 	);
 	wrap.footer.append(h('button', { class:'button', onclick: async () => {
 		if (!name || !value || !date) { alert('Bitte alle Pflichtfelder ausfüllen'); return; }
-		await api('/api/plans', { method:'POST', body: JSON.stringify({ name, value, date }) });
+		await api('api/plans', { method:'POST', body: JSON.stringify({ name, value, date }) });
 		await refreshPlansTable();
 	} }, 'Speichern'));
 	wrap.body.append(h('div', { style:'margin-top:10px' }, plansTable()));
 }
 
 async function refreshPlansTable() {
-	state.plans = await api('/api/plans');
+	state.plans = await api('api/plans');
 	render();
 }
 
 function plansTable() {
 	const rows = (state.plans||[]).map(p => {
 		const btns = h('div', {},
-			h('button', { class:'button', onclick: async () => { await api(`/api/plans/${p.id}/erledigt`, { method:'POST' }); await refreshPlansTable(); } }, 'erledigt'),
-			h('button', { class:'button', onclick: async () => { const name=prompt('Neuer Name', p.name)||p.name; const value=Number(prompt('Neuer Wert', p.value)||p.value); const date=prompt('Neues Datum (YYYY-MM-DD)', fmtDate(p.date))||fmtDate(p.date); await api(`/api/plans/${p.id}`, { method:'PUT', body: JSON.stringify({ name, value, date }) }); await refreshPlansTable(); } }, 'ändern'),
-			h('button', { class:'button warn', onclick: async () => { await api(`/api/plans/${p.id}`, { method:'DELETE' }); await refreshPlansTable(); } }, 'löschen')
+			h('button', { class:'button', onclick: async () => { await api(`api/plans/${p.id}/erledigt`, { method:'POST' }); await refreshPlansTable(); } }, 'erledigt'),
+			h('button', { class:'button', onclick: async () => { const name=prompt('Neuer Name', p.name)||p.name; const value=Number(prompt('Neuer Wert', p.value)||p.value); const date=prompt('Neues Datum (YYYY-MM-DD)', fmtDate(p.date))||fmtDate(p.date); await api(`api/plans/${p.id}`, { method:'PUT', body: JSON.stringify({ name, value, date }) }); await refreshPlansTable(); } }, 'ändern'),
+			h('button', { class:'button warn', onclick: async () => { await api(`api/plans/${p.id}`, { method:'DELETE' }); await refreshPlansTable(); } }, 'löschen')
 		);
 		return h('tr', {}, h('td', {}, p.status), h('td', {}, fmtDate(p.date)), h('td', {}, p.name), h('td', {}, money(p.value)), h('td', {}, btns));
 	});
@@ -307,7 +315,7 @@ function editVoucher(v) {
 	);
 	wrap.footer.append(h('button', { class:'button', onclick: async () => {
 		try {
-			await api(`/api/vouchers/${v.id}`, { method:'PUT', body: JSON.stringify({ date, code, value, remaining, shop, in_review, assigned_to, object }) });
+			await api(`api/vouchers/${v.id}`, { method:'PUT', body: JSON.stringify({ date, code, value, remaining, shop, in_review, assigned_to, object }) });
 			wrap.close();
 			await refreshData();
 		} catch (e) { alert(e.message); }
