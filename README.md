@@ -1,6 +1,7 @@
 # deZents kleine Bambu-Gutschein Verwaltung
 
-Eine kleine, per Docker Compose (Portainer) deploybare Web-App zur Verwaltung von Bambu-Gutscheinen.
+Eine kleine, per Docker deploybare Web-App zur Verwaltung von Bambu-Gutscheinen.
+##ja...eine Excel Datei hätte es auch getan... :-)
 
 ## Features (kurz)
 - Passwortschutz (Default: `bambu`, muss beim ersten Login geändert werden)
@@ -8,46 +9,21 @@ Eine kleine, per Docker Compose (Portainer) deploybare Web-App zur Verwaltung vo
 - KPI-Dashboard (Summen, Prognosen 3/6/12 Monate, Tabellen & Listen)
 - Dunkles, modernes UI; optionales Hintergrundbild `public/background.png`
 - Persistente Daten (SQLite-Datei in Volume)
+- Upload einer CSV Datei mit alten Gutscheinen (Datum;GutscheinNR;Name;Objekt)
+  
 
-## Schnellstart (Docker Compose / Portainer)
-
-1. Optional: `public/background.png` bereitstellen (wird automatisch eingebunden)
-2. In Portainer einen neuen Stack erstellen
-3. Folgendes Compose YAML in Portainer einfügen und deployen:
-
-```yaml
-version: '3.8'
-services:
-  web:
-    image: ghcr.io/worksasdesigned/bambu:latest # ODER build aus Repository; hier beim lokalen Deploy build: .
-    build: .
-    container_name: bambu-gutschein-web
-    ports:
-      - "8080:3000"
-    environment:
-      - PORT=3000
-      - NODE_ENV=production
-    volumes:
-      - data:/app/data
-      - ./public/background.png:/app/public/background.png:ro
-    restart: unless-stopped
-volumes:
-  data:
-```
+## docker Befehle
+`
+ker pull ghcr.io/worksasdesigned/bambu:latest
+docker run -d --name bambu-gutschein-web -p 8080:3000 -e PORT=3000 -e NODE_ENV=production ghcr.io/worksasdesigned/bambu:latest
+docker logs -f bambu-gutschein-web
+`
 
 4. Nach dem Deploy ist die App unter `http://<host>:8080` erreichbar
 5. Testseite aufrufen: `http://<host>:8080/test.html`
    - Zeigt, ob `styles.css` und der Healthcheck `/health` erreichbar sind
 5. Beim ersten Aufruf mit Passwort `bambu` anmelden und ein neues Passwort setzen
 
-## Lokaler Build ohne Portainer
-
-```bash
-npm install
-npm run start
-# App unter http://localhost:3000
-# Testseite: http://localhost:3000/test.html
-```
 
 ## Hinweise
 - Daten werden in `/app/data` (SQLite) persistiert. Das Compose-Volume `data` bewahrt diese Daten über Container-Neustarts.
@@ -55,18 +31,6 @@ npm run start
 
 Weitere Funktionen und die komplette UI folgen in den nächsten Schritten.
 
-## Portainer: Schritt-für-Schritt
+Portainer habe ich nicht mehr ausprobiert. Es funktioniert mit dem docker Befehl. Fertig. 
+Erzeugt mit cursor.com als kleiner KI Test.
 
-- In Portainer: Stacks -> Add Stack
-- Namen vergeben (z.B. bambu-gutschein)
-- Compose-Datei aus diesem Repo in das Textfeld kopieren (siehe Abschnitt oben)
-- Optional: Unter "Web editor" eine Datei `public/background.png` per Bind-Mount hinzufügen (siehe volumes-Zeile)
-- Deploy Stack klicken
-
-Standard-URL: `http://<server>:8080`
-
-### Umgebungsvariablen (optional)
-- `PORT` (default 3000)
-- `DEFAULT_PASSWORD` (default `bambu`)
-- `APP_SECRET` (HMAC Secret für Session-Cookie, bitte setzen)
-- `DATA_DIR` (default `/app/data`)
