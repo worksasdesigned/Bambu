@@ -38,7 +38,10 @@ function h(tag, attrs={}, ...children) {
 }
 
 async function api(path, opts={}) {
-	const res = await fetch(path, { credentials: 'include', headers: { 'Content-Type': 'application/json' }, ...opts });
+	const p = location.pathname;
+	const base = (p === '/') ? '' : (p.endsWith('/') ? p.slice(0, -1) : p);
+	const url = path.startsWith('/') ? `${base}${path}` : path;
+	const res = await fetch(url, { credentials: 'include', headers: { 'Content-Type': 'application/json' }, ...opts });
 	if (!res.ok) throw new Error((await res.json()).error || 'Fehler');
 	return res.json();
 }
