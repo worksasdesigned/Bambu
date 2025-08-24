@@ -14,10 +14,17 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(helmet({
+	// Allow plain HTTP usage on LAN: disable HTTPS-forcing headers and upgrades
+	hsts: false,
+	crossOriginOpenerPolicy: false,
+	originAgentCluster: false,
+	crossOriginEmbedderPolicy: false,
 	contentSecurityPolicy: {
 		useDefaults: true,
 		directives: {
 			"script-src": ["'self'", "'unsafe-inline'"],
+			// Do not auto-upgrade http -> https for subresources
+			"upgrade-insecure-requests": null
 		}
 	}
 }));
