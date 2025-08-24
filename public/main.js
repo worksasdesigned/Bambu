@@ -28,6 +28,8 @@ function h(tag, attrs={}, ...children) {
 		else if (k === 'onchange') el.addEventListener('change', v);
 		else if (k === 'value') el.value = v;
 		else if (k === 'checked') el.checked = !!v;
+		else if (k === 'selected') { if (v) el.selected = true; }
+		else if (typeof v === 'boolean') { if (v) el.setAttribute(k, ''); }
 		else el.setAttribute(k, v);
 	}
 	for (const c of children.flat()) {
@@ -153,10 +155,8 @@ function dashboard() {
 			kpiCard('Prognose 12 Monate', money(state.kpis.forecast.m12))
 		);
 		wrap.appendChild(g);
-		// Assigned table
-		wrap.appendChild(card('Verteilt an', table(['Name','Anzahl','Summe','Letztes Datum'], (state.kpis.assigned||[]).map(r => [r.name, r.count, money(r.sum), fmtDate(r.last_date)]))));
-		// Objects list
-		wrap.appendChild(card('Objekte (gekauft)', table(['Objekt','Anzahl'], (state.kpis.objects||[]).map(r => [r.object, r.count]))));
+		// Assigned table (sortable)
+		wrap.appendChild(card('Verteilt an', assignedTable(state.kpis.assigned||[])));
 	}
 	// Planned vouchers tiles
 	if (state.plans && state.kpis) {
@@ -167,7 +167,7 @@ function dashboard() {
 	// All vouchers table
 	if (state.vouchers) {
 		const rows = state.vouchers.map(v => voucherRow(v));
-		wrap.appendChild(card('Alle Gutscheine', tableEl(rows, ['Datum','Gutscheinnummer','Tage seit letztem Gutschein'])));
+		wrap.appendChild(card('Alle Gutscheine', tableEl(rows, ['Datum','Gutscheinnummer','Tage seit letztem Gutschein','Objekt'])));
 	}
 	return wrap;
 }
@@ -193,6 +193,7 @@ function plannedCard(p, available) {
 }
 
 function table(headers, rows) {
+	// Generic static table (kept for legacy usage)
 	const thead = h('tr', {}, ...headers.map(hd => h('th', { style:'text-align:left;color:#9ca3af;font-weight:600' }, hd)));
 	const body = rows.map(r => h('tr', {}, ...r.map(c => h('td', {}, c))));
 	return h('table', { class:'table' }, thead, ...body);
@@ -204,11 +205,13 @@ function tableEl(rows, headers) {
 }
 
 function voucherRow(v) {
-	const cls = v.used ? 'row-red' : (v.in_review ? 'row-yellow' : 'row-green');
+	const assigned = v.assigned_to && String(v.assigned_to).trim() !== '';
+	const cls = (v.used || assigned) ? 'row-red' : (v.in_review ? 'row-yellow' : 'row-green');
 	const tr = h('tr', { class: cls, onclick: () => editVoucher(v) },
 		h('td', {}, fmtDate(v.date)),
 		h('td', {}, v.code),
-		h('td', {}, v.days_since_previous == null ? '-' : String(v.days_since_previous))
+		h('td', {}, v.days_since_previous == null ? '-' : String(v.days_since_previous)),
+		h('td', {}, v.object || '-')
 	);
 	return tr;
 }
@@ -228,6 +231,7 @@ function showCaptureForm() {
 		try {
 			await api('/api/vouchers', { method:'POST', body: JSON.stringify({ date, code, value, remaining, shop, in_review }) });
 			wrap.close();
+			showToast('Datensatz erfasst');
 			await refreshData();
 		} catch (e) { alert(e.message); }
 	} }, 'Speichern'));
@@ -266,6 +270,7 @@ function assignSelected(wrap) {
 		try {
 			await api('/api/vouchers/assign', { method:'POST', body: JSON.stringify({ ids: Array.from(state.selection), name, object, date }) });
 			wrap.close();
+			showToast('Datensatz gespeichert');
 			await refreshData();
 		} catch (e) { alert(e.message); }
 	} }, 'Speichern'));
@@ -282,6 +287,8 @@ function showPlanManager() {
 	wrap.footer.append(h('button', { class:'button primary', onclick: async () => {
 		if (!name || !value || !date) { alert('Bitte alle Pflichtfelder ausfüllen'); return; }
 		await api('/api/plans', { method:'POST', body: JSON.stringify({ name, value, date }) });
+		showToast('Datensatz gespeichert');
+		wrap.close();
 		await refreshPlansTable();
 	} }, 'Speichern'));
 	wrap.body.append(h('div', { style:'margin-top:10px' }, plansTable()));
@@ -322,6 +329,7 @@ function editVoucher(v) {
 		try {
 			await api(`/api/vouchers/${v.id}`, { method:'PUT', body: JSON.stringify({ date, code, value, remaining, shop, in_review, assigned_to, object }) });
 			wrap.close();
+			showToast('Datensatz gespeichert');
 			await refreshData();
 		} catch (e) { alert(e.message); }
 	} }, 'Speichern'));
@@ -330,8 +338,55 @@ function editVoucher(v) {
 function formRow(labelText, inputEl) { return h('div', { class:'form-row' }, h('div', {}, h('label', {}, labelText), inputEl)); }
 
 function selectShop(selected, onChange) {
-	const sel = h('select', { onchange: e=>onChange(e.target.value) }, ...SHOPS.map(s => h('option', { value:s.code, selected:selected===s.code }, `${s.flag} ${s.code}`)));
+	const sel = h('select', { value: selected, onchange: e=>onChange(e.target.value) }, ...SHOPS.map(s => h('option', { value:s.code }, s.code)));
 	return sel;
+}
+
+function assignedTable(rows) {
+	let sortKey = 'last_date';
+	let asc = false; // default: last date desc
+	const tbl = h('table', { class:'table' });
+	const headCells = ['Name','Anzahl','Summe','Letztes Datum'];
+	const keyByIndex = ['name','count','sum','last_date'];
+	const thead = h('thead', {}, h('tr', {}, ...headCells.map((hd, idx) => h('th', { style:'text-align:left;color:#9ca3af;font-weight:600;cursor:pointer', onclick: () => {
+		const key = keyByIndex[idx];
+		if (sortKey === key) asc = !asc; else { sortKey = key; asc = true; }
+		renderBody();
+	} }, hd))));
+	const tbody = h('tbody', {});
+	tbl.append(thead, tbody);
+	function renderBody() {
+		tbody.innerHTML = '';
+		const sorted = [...rows].sort((a,b) => {
+			const va = a[sortKey];
+			const vb = b[sortKey];
+			if (sortKey === 'count' || sortKey === 'sum') return asc ? (Number(va||0) - Number(vb||0)) : (Number(vb||0) - Number(va||0));
+			if (sortKey === 'last_date') {
+				const da = va || '';
+				const db = vb || '';
+				return asc ? da.localeCompare(db) : db.localeCompare(da);
+			}
+			const sa = String(va||'');
+			const sb = String(vb||'');
+			return asc ? sa.localeCompare(sb) : sb.localeCompare(sa);
+		});
+		for (const r of sorted) {
+			tbody.appendChild(h('tr', {}, h('td', {}, r.name), h('td', {}, r.count), h('td', {}, money(r.sum)), h('td', {}, fmtDate(r.last_date))));
+		}
+	}
+	renderBody();
+	return tbl;
+}
+
+function showToast(message) {
+	let container = document.getElementById('toast-container');
+	if (!container) {
+		container = h('div', { id:'toast-container', class:'toast-container' });
+		document.body.appendChild(container);
+	}
+	const el = h('div', { class:'toast' }, message);
+	container.appendChild(el);
+	setTimeout(() => { el.remove(); }, 2000);
 }
 
 function modal(titleText) {

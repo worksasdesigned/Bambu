@@ -48,9 +48,9 @@ body{margin:0;background:var(--bg) url('/background.png') center/cover no-repeat
 .table{width:100%;border-collapse:separate;border-spacing:0 8px}
 .table tr{background:rgba(17,24,39,.9)}
 .table td,.table th{padding:10px 12px}
-.row-green{outline:2px solid var(--green)}
-.row-yellow{outline:2px solid var(--yellow)}
-.row-red{outline:2px solid var(--red)}
+.row-green{background: rgba(16,185,129,.12) !important}
+.row-yellow{background: rgba(234,179,8,.12) !important}
+.row-red{background: rgba(239,68,68,.12) !important}
 input,select{background:#0b1220;border:1px solid #24324a;color:var(--fg);border-radius:10px;padding:10px;width:100%}
 label{font-size:12px;color:var(--muted)}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -58,3 +58,7 @@ label{font-size:12px;color:var(--muted)}
 .footer{color:#6b7280;font-size:12px;margin-top:24px}
 .table tr.selected{outline:2px dashed var(--accent)}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50}
+
+/* Toasts */
+.toast-container{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:100}
+.toast{background:#111827;border:1px solid #1f2937;color:#e5e7eb;padding:10px 14px;border-radius:10px;box-shadow:0 10px 20px rgba(0,0,0,.25)}
