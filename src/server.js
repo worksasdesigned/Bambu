@@ -75,13 +75,62 @@ app.get('/api/vouchers/:id', (req, res) => {
 app.post('/api/vouchers', (req, res) => {
 	const { date, code, value = 40, remaining = 40, shop = 'EU', in_review = false } = req.body || {};
 	if (!date || !code) return res.status(400).json({ error: 'date und code erforderlich' });
-	if (String(code).length !== 20) return res.status(400).json({ error: 'Gutscheincode muss 20 Stellen haben' });
 	try {
 		const result = createVoucher({ date, code, value, remaining, shop, in_review: in_review ? 1 : 0, assigned_to: null, object: null, used: 0, used_date: null });
 		res.json({ ok: true, id: result.lastInsertRowid });
 	} catch (e) {
 		res.status(400).json({ error: e.message });
 	}
+});
+
+app.post('/api/vouchers/import', (req, res) => {
+	const { csv } = req.body || {};
+	if (!csv || typeof csv !== 'string') return res.status(400).json({ error: 'csv erforderlich' });
+	const lines = csv.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+	let created = 0, skipped = 0, used_marked = 0;
+	function parseDate(input) {
+		if (!input) return new Date().toISOString().split('T')[0];
+		const s = String(input).trim();
+		if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+		const m = s.match(/^(\d{1,2})[.](\d{1,2})[.](\d{2,4})$/);
+		if (m) {
+			const d = m[1].padStart(2,'0');
+			const mo = m[2].padStart(2,'0');
+			const y = m[3].length === 2 ? ('20'+m[3]) : m[3];
+			return `${y}-${mo}-${d}`;
+		}
+		return new Date().toISOString().split('T')[0];
+	}
+	for (let idx = 0; idx < lines.length; idx++) {
+		const line = lines[idx];
+		const partsRaw = line.split(';');
+		const parts = partsRaw.map(p => p.trim());
+		if (idx === 0) {
+			const hd0 = parts[0]?.toLowerCase();
+			const hd1 = parts[1]?.toLowerCase();
+			if (hd0?.includes('datum') && hd1?.includes('gutschein')) {
+				continue; // header überspringen
+			}
+		}
+		if (parts.length < 2) { skipped++; continue; }
+		const date = parseDate(parts[0] || '');
+		const code = parts[1] || '';
+		const name = parts[2] || '';
+		const object = parts[3] || '';
+		if (!code) { skipped++; continue; }
+		const used = (name && name.trim()) || (object && object.trim()) ? 1 : 0;
+		const remaining = used ? 0 : 40;
+		const used_date = used ? date : null;
+		try {
+			createVoucher({ date, code, value: 40, remaining, shop: 'EU', in_review: 0, assigned_to: name || null, object: object || null, used, used_date });
+			created++;
+			if (used) used_marked++;
+		} catch (e) {
+			// z.B. Duplikat -> überspringen
+			skipped++;
+		}
+	}
+	res.json({ ok: true, created, skipped, used_marked });
 });
 
 app.put('/api/vouchers/:id', (req, res) => {
