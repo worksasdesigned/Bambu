@@ -104,7 +104,8 @@ function header() {
 			h('button', { class: 'button', onclick: () => showCaptureForm() }, 'Gutschein erfassen'),
 			h('button', { class: 'button alt', onclick: () => showAssignList() }, 'Gutscheine verwenden'),
 			h('button', { class: 'button warn', onclick: () => showPlanManager() }, 'Gutscheine planen'),
-			h('button', { class: 'button', onclick: () => showImportModal() }, 'Import Data'),
+			h('button', { class: 'button', onclick: () => showImportModal() }, 'Data import'),
+			h('button', { class: 'button', onclick: () => exportData() }, 'Data Export'),
 			h('button', { class: 'button', onclick: async () => { await api('/api/logout', { method: 'POST' }); location.reload(); } }, 'Logout')
 		) : ''
 	);
@@ -545,7 +546,7 @@ function modal(titleText) {
 }
 
 function showImportModal() {
-	const wrap = modal('Import Data');
+	const wrap = modal('Data import');
 	let text='';
 	const textarea = h('textarea', { style:'width:100%;min-height:280px', placeholder:'Datum;Gutschein;Name;Objekt', oninput:e=>text=e.target.value });
 	wrap.body.append(
@@ -563,6 +564,28 @@ function showImportModal() {
 			alert(e.message);
 		}
 	} }, 'Speichern'));
+}
+
+async function exportData() {
+	try {
+		const p = location.pathname;
+		const base = (p === '/') ? '' : (p.endsWith('/') ? p.slice(0, -1) : p);
+		const url = `${base}/api/vouchers/export`;
+		const res = await fetch(url, { credentials:'include' });
+		if (!res.ok) { const t = await res.text(); throw new Error(t||'Export fehlgeschlagen'); }
+		const blob = await res.blob();
+		const a = document.createElement('a');
+		const href = URL.createObjectURL(blob);
+		a.href = href;
+		a.download = `vouchers_${new Date().toISOString().slice(0,10)}.csv`;
+		document.body.appendChild(a);
+		a.click();
+		URL.revokeObjectURL(href);
+		a.remove();
+		showToast('CSV Export gestartet');
+	} catch (e) {
+		alert(e.message);
+	}
 }
 
 bootstrap().catch(err => { console.error(err); });
