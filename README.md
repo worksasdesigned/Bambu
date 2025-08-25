@@ -25,11 +25,11 @@ Man kann auch Gutscheine (Beträge) planen und sieh welcher Plan bereits erfüll
 
 
 ## Installation unter docker
-`
+```
 doker pull ghcr.io/worksasdesigned/bambu:latest
 docker run -d --name bambu-gutschein-web -p 8080:3000 -e PORT=3000 -e NODE_ENV=production ghcr.io/worksasdesigned/bambu:latest
 docker logs -f bambu-gutschein-web
-`
+```
 
 4. Nach dem Deploy ist die App unter `http://<host>:8080` erreichbar
 5. Testseite aufrufen: `http://<host>:8080/test.html`
