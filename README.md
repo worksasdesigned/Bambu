@@ -1,6 +1,7 @@
 # deZents kleine Bambu-Gutschein Verwaltung
 
-Eine kleine, per Docker deploybare Web-App zur Verwaltung von Bambu-Gutscheinen.
+Eine kleine, per Docker deploybare Web-App zur Verwaltung von Bambu-Gutscheinen. </br>
+
 ##ja...eine Excel Datei hätte es auch getan... :-)
 
 ## Features (kurz)
@@ -10,7 +11,7 @@ Eine kleine, per Docker deploybare Web-App zur Verwaltung von Bambu-Gutscheinen.
 - Dunkles, modernes UI; optionales Hintergrundbild `public/background.png`
 - Persistente Daten (SQLite-Datei in Volume)
 - Upload einer CSV Datei mit alten Gutscheinen (Datum;GutscheinNR;Name;Objekt)
-  
+- export der Gutscheine als CSV Datei als backup  
 
 ## docker Befehle
 `
@@ -28,9 +29,4 @@ docker logs -f bambu-gutschein-web
 ## Hinweise
 - Daten werden in `/app/data` (SQLite) persistiert. Das Compose-Volume `data` bewahrt diese Daten über Container-Neustarts.
 - Passwort-Reset: Im Container ein leeres Flag `data/reset-password` anlegen (oder die Datei `reset-password` in `data/` anlegen). Nach Neustart wird wieder `bambu` verlangt und eine Änderung erzwungen.
-
-Weitere Funktionen und die komplette UI folgen in den nächsten Schritten.
-
-Portainer habe ich nicht mehr ausprobiert. Es funktioniert mit dem docker Befehl. Fertig. 
-Erzeugt mit cursor.com als kleiner KI Test.
 
