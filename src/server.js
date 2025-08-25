@@ -45,7 +45,14 @@ function verifySignedCookie(signedValue) {
 async function main() {
 	const app = express();
 	app.disable('x-powered-by');
-	app.use(helmet());
+	app.use(helmet({
+		// Disable HTTPS-only header for local HTTP usage
+		strictTransportSecurity: false,
+		// Disable COOP to avoid warnings on non-trustworthy origins
+		crossOriginOpenerPolicy: false,
+		// Disable Origin-Agent-Cluster to avoid mixed keying warnings
+		originAgentCluster: false
+	}));
 	app.use(cors({ origin: true, credentials: true }));
 	app.use(cookieParser());
 	app.use(express.json({ limit: '2mb' }));
