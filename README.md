@@ -2,7 +2,7 @@
 
 Eine kleine, per Docker deploybare Web-App zur Verwaltung von Bambu-Gutscheinen. </br>
 
-##ja...eine Excel Datei hätte es auch getan... :-)
+## ja...eine Excel Datei hätte es auch getan... :-)
 
 ## Features (kurz)
 - Passwortschutz (Default: `bambu`, muss beim ersten Login geändert werden)
