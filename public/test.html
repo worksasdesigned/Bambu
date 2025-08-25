@@ -4,7 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Testseite – Bambu-Gutschein</title>
-  <link rel="stylesheet" href="/styles.css" />
+  <script>
+    if (location.protocol === 'https:') {
+      location.replace('http://' + location.host + location.pathname + location.search + location.hash);
+    }
+  </script>
+  <link rel="stylesheet" href="styles.css" />
   <style>
     .ok { color: #10b981; }
     .bad { color: #ef4444; }
