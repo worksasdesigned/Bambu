@@ -97,13 +97,15 @@ function render() {
 
 function header() {
 	return h('div', { class: 'header' },
-		h('div', { class: 'title' }, 'deZents kleine Bambu-Gutschein Verwaltung ', h('small', { style:'color:#9ca3af;font-weight:400' }, '- wenn Hobbies Hobbies finanzieren')),
-		state.session.authed ? h('div', {},
+		// Title + subtitle with line break
+		h('div', { class: 'title' }, 'deZents kleine Bambu-Gutschein-Verwaltung', h('small', {}, 'Wenn Hobbies Hobbies finanzieren.')),
+		h('hr', { class: 'divider' }),
+		state.session.authed ? h('div', { class: 'button-bar' },
 			h('button', { class: 'button', onclick: () => showCaptureForm() }, 'Gutschein erfassen'),
 			h('button', { class: 'button alt', onclick: () => showAssignList() }, 'Gutscheine verwenden'),
-			h('button', { class: 'button warn', onclick: () => showPlanManager() }, 'Gutscheine Planen'),
-			h('button', { class: 'button', style:'margin-left:8px', onclick: () => showImportModal() }, 'Import Data'),
-			h('button', { class: 'button', style:'margin-left:8px', onclick: async () => { await api('/api/logout', { method: 'POST' }); location.reload(); } }, 'Logout')
+			h('button', { class: 'button warn', onclick: () => showPlanManager() }, 'Gutscheine planen'),
+			h('button', { class: 'button', onclick: () => showImportModal() }, 'Import Data'),
+			h('button', { class: 'button', onclick: async () => { await api('/api/logout', { method: 'POST' }); location.reload(); } }, 'Logout')
 		) : ''
 	);
 }
@@ -144,10 +146,20 @@ function changePasswordCard() {
 }
 
 function dashboard() {
-	const wrap = h('div', {});
+	const wrap = h('div', { class: 'stack' });
+
+	// Chart section (large tile)
+	if (state.vouchers && state.kpis) {
+		wrap.appendChild(card('Wertentwicklung', chartCard()));
+	}
+
 	// KPI grid
 	if (state.kpis) {
+		const totalCount = (state.vouchers||[]).length;
+		const availableCount = (state.available||[]).length;
 		const g = h('div', { class:'grid' },
+			kpiCard('Anzahl Gutschein gesamt', totalCount),
+			kpiCard('Anzahl Gutscheine verfügbar', availableCount),
 			kpiCard('Summe erhalten', money(state.kpis.totalReceived)),
 			kpiCard('Summe verfügbar', money(state.kpis.totalAvailable)),
 			kpiCard('Prognose 3 Monate', money(state.kpis.forecast.m3)),
@@ -167,7 +179,7 @@ function dashboard() {
 	// All vouchers table
 	if (state.vouchers) {
 		const rows = state.vouchers.map(v => voucherRow(v));
-		wrap.appendChild(card('Alle Gutscheine', tableEl(rows, ['Datum','Gutscheinnummer','Tage seit letztem Gutschein','Objekt'])));
+		wrap.appendChild(card('Alle Gutscheine', tableEl(rows, ['Datum','Gutscheinnummer','Tage seit letztem Gutschein','Restwert','Objekt'])));
 	}
 	return wrap;
 }
@@ -178,6 +190,129 @@ function kpiCard(label, value) {
 
 function card(title, inner) {
 	return h('div', { class:'card' }, h('div', { style:'font-weight:700;margin-bottom:8px' }, title), inner);
+}
+
+function chartCard() {
+	const box = h('div', {});
+	const canvas = h('canvas', { style:'width:100%;height:300px;display:block' });
+	box.appendChild(canvas);
+
+	function computeSeries() {
+		const vouchers = (state.vouchers||[]).map(v => ({
+			date: new Date(v.date),
+			value: Number(v.value||0),
+			remaining: Number(v.remaining||0),
+			used_date: v.used_date ? new Date(v.used_date) : null
+		}));
+		vouchers.sort((a,b) => a.date - b.date);
+		const dates = new Set();
+		for (const v of vouchers) { dates.add(v.date.toISOString().slice(0,10)); if (v.used_date) dates.add(v.used_date.toISOString().slice(0,10)); }
+		const sortedDates = Array.from(dates).sort();
+		let cumReceived = 0;
+		const points = [];
+		for (const ds of sortedDates) {
+			const d = new Date(ds);
+			// increment received for vouchers created on this date
+			for (const v of vouchers) { if (v.date.toISOString().slice(0,10) === ds) cumReceived += v.value; }
+			// available at date ds: sum remaining for vouchers born on/before d and not used before/at d
+			let available = 0;
+			for (const v of vouchers) {
+				const born = v.date <= d;
+				const stillAvailable = !v.used_date || v.used_date > d;
+				if (born && stillAvailable) available += v.remaining;
+			}
+			points.push({ date: d, received: cumReceived, available });
+		}
+		return points;
+	}
+
+	function draw() {
+		const dpr = window.devicePixelRatio || 1;
+		const rect = canvas.getBoundingClientRect();
+		canvas.width = Math.floor(rect.width * dpr);
+		canvas.height = Math.floor(rect.height * dpr);
+		const ctx = canvas.getContext('2d');
+		ctx.scale(dpr, dpr);
+		ctx.clearRect(0, 0, rect.width, rect.height);
+
+		const series = computeSeries();
+		if (series.length === 0) return;
+		const pad = { l: 40, r: 12, t: 8, b: 24 };
+		const w = rect.width - pad.l - pad.r;
+		const h = rect.height - pad.t - pad.b;
+		const maxY = Math.max(...series.map(p => Math.max(p.received, p.available))) || 1;
+		const minX = series[0].date.getTime();
+		const maxX = series[series.length - 1].date.getTime();
+
+		function xFor(t) { return pad.l + w * ((t - minX) / Math.max(1, (maxX - minX))); }
+		function yFor(v) { return pad.t + h - (h * (v / maxY)); }
+
+		// axes
+		ctx.strokeStyle = '#1f2937';
+		ctx.lineWidth = 1;
+		ctx.beginPath();
+		ctx.moveTo(pad.l, pad.t);
+		ctx.lineTo(pad.l, pad.t + h);
+		ctx.lineTo(pad.l + w, pad.t + h);
+		ctx.stroke();
+
+		// ticks (y)
+		ctx.fillStyle = '#9ca3af';
+		ctx.font = '12px sans-serif';
+		const steps = 4;
+		for (let i = 1; i <= steps; i++) {
+			const v = (maxY / steps) * i;
+			const y = yFor(v);
+			ctx.strokeStyle = 'rgba(31,41,55,.5)';
+			ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + w, y); ctx.stroke();
+			ctx.fillText(money(v), 4, y - 2);
+		}
+
+		// build paths
+		const pathReceived = new Path2D();
+		const pathAvailable = new Path2D();
+		series.forEach((p, idx) => {
+			const x = xFor(p.date.getTime());
+			const yr = yFor(p.received);
+			const ya = yFor(p.available);
+			if (idx === 0) { pathReceived.moveTo(x, yr); pathAvailable.moveTo(x, ya); }
+			else { pathReceived.lineTo(x, yr); pathAvailable.lineTo(x, ya); }
+		});
+
+		// animated draw
+		let t = 0;
+		function frame() {
+			ctx.clearRect(0, 0, rect.width, rect.height);
+			// redraw axes and grid
+			ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, pad.t + h); ctx.lineTo(pad.l + w, pad.t + h); ctx.stroke();
+			ctx.fillStyle = '#9ca3af'; ctx.font = '12px sans-serif';
+			for (let i = 1; i <= steps; i++) { const v = (maxY / steps) * i; const y = yFor(v); ctx.strokeStyle = 'rgba(31,41,55,.5)'; ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + w, y); ctx.stroke(); ctx.fillText(money(v), 4, y - 2); }
+
+			ctx.save();
+			ctx.lineWidth = 2;
+			ctx.strokeStyle = '#06b6d4'; // cyan received
+			ctx.setLineDash([w]);
+			ctx.lineDashOffset = (1 - t) * w;
+			ctx.stroke(pathReceived);
+			ctx.restore();
+
+			ctx.save();
+			ctx.lineWidth = 2;
+			ctx.strokeStyle = '#10b981'; // green available
+			ctx.setLineDash([w]);
+			ctx.lineDashOffset = (1 - t) * w;
+			ctx.stroke(pathAvailable);
+			ctx.restore();
+
+			if (t < 1) { t += 0.03; requestAnimationFrame(frame); }
+		}
+		frame();
+	}
+
+	// draw now and on resize
+	setTimeout(draw, 0);
+	window.addEventListener('resize', draw);
+	return box;
 }
 
 function plannedCard(p, available) {
@@ -206,11 +341,15 @@ function tableEl(rows, headers) {
 
 function voucherRow(v) {
 	const assigned = v.assigned_to && String(v.assigned_to).trim() !== '';
-	const cls = (v.used || assigned) ? 'row-red' : (v.in_review ? 'row-yellow' : 'row-green');
+	let cls = 'row-green';
+	if (Number(v.remaining||0) > 0 && Number(v.remaining||0) < 40) cls = 'row-blue';
+	else if (v.used || assigned) cls = 'row-red';
+	else if (v.in_review) cls = 'row-yellow';
 	const tr = h('tr', { class: cls, onclick: () => editVoucher(v) },
 		h('td', {}, fmtDate(v.date)),
 		h('td', {}, v.code),
 		h('td', {}, v.days_since_previous == null ? '-' : String(v.days_since_previous)),
+		h('td', {}, money(v.remaining)),
 		h('td', {}, v.object || '-')
 	);
 	return tr;
@@ -338,7 +477,10 @@ function editVoucher(v) {
 function formRow(labelText, inputEl) { return h('div', { class:'form-row' }, h('div', {}, h('label', {}, labelText), inputEl)); }
 
 function selectShop(selected, onChange) {
-	const sel = h('select', { value: selected, onchange: e=>onChange(e.target.value) }, ...SHOPS.map(s => h('option', { value:s.code }, s.code)));
+	const options = SHOPS.map(s => h('option', { value:s.code, selected: s.code === selected }, `${s.flag} ${s.code}`));
+	const sel = h('select', { onchange: e=>onChange(e.target.value) }, ...options);
+	// Ensure the correct initial selection after options are appended
+	if (selected) sel.value = selected;
 	return sel;
 }
 
